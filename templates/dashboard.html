@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICU Bot Analytics Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4facfe;
+            --secondary: #00f2fe;
+            --bg-dark: #0f172a;
+            --card-glass: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --accent: #f43f5e;
+            --text: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--card_glass);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(12px);
+            padding: 1.5rem;
+            border-radius: 20px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.6s ease-out both;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.2rem;
+            font-weight: 600;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+        }
+
+        .chart-card {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(8px);
+            padding: 2rem;
+            border-radius: 24px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1.5rem;
+            font-weight: 400;
+            color: #cbd5e1;
+        }
+
+        canvas {
+            max-width: 100% !important;
+            max-height: 100% !important;
+        }
+
+        .refresh-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ICU Bot Analytics</h1>
+            <p>Real-time insights into user engagement and performance.</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="metric-card" style="animation-delay: 0.1s">
+                <div class="metric-label">Total Users</div>
+                <div id="stat-total-users" class="metric-value">-</div>
+            </div>
+            <div class="metric-card" style="animation-delay: 0.2s">
+                <div class="metric-label">Polls Sent</div>
+                <div id="stat-polls-sent" class="metric-value">-</div>
+            </div>
+            <div class="metric-card" style="animation-delay: 0.3s">
+                <div class="metric-label">Polls Answered</div>
+                <div id="stat-polls-answered" class="metric-value">-</div>
+            </div>
+            <div class="metric-card" style="animation-delay: 0.4s">
+                <div class="metric-label">/next Usage</div>
+                <div id="stat-next-commands" class="metric-value">-</div>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>Global Accuracy Rate</h3>
+                <canvas id="accuracyChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Send vs Answer Rate</h3>
+                <canvas id="engagementChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="refresh-status" id="refresh-time">Auto-refreshing every 30s...</div>
+
+    <script>
+        let accuracyChart, engagementChart;
+
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                if (data.error) throw new Error(data.error);
+
+                // Update Metric values
+                document.getElementById('stat-total-users').textContent = data.total_users;
+                document.getElementById('stat-polls-sent').textContent = data.polls_sent;
+                document.getElementById('stat-polls-answered').textContent = data.polls_answered;
+                document.getElementById('stat-next-commands').textContent = data.next_commands;
+
+                // Accuracy Chart
+                const incorrect = data.polls_answered - data.correct_answers;
+                updateAccuracyChart(data.correct_answers, incorrect);
+
+                // Engagement Chart
+                const ignored = Math.max(0, data.polls_sent - data.polls_answered);
+                updateEngagementChart(data.polls_answered, ignored);
+
+            } catch (err) {
+                console.error("Dashboard update failed:", err);
+            }
+        }
+
+        function updateAccuracyChart(correct, incorrect) {
+            const ctx = document.getElementById('accuracyChart').getContext('2d');
+            if (accuracyChart) {
+                accuracyChart.data.datasets[0].data = [correct, incorrect];
+                accuracyChart.update();
+            } else {
+                accuracyChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Correct', 'Incorrect'],
+                        datasets: [{
+                            data: [correct, incorrect],
+                            backgroundColor: ['#10b981', '#f43f5e'],
+                            borderColor: 'transparent',
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#f8fafc' } }
+                        },
+                        responsive: true,
+                        cutout: '70%'
+                    }
+                });
+            }
+        }
+
+        function updateEngagementChart(answered, ignored) {
+            const ctx = document.getElementById('engagementChart').getContext('2d');
+            if (engagementChart) {
+                engagementChart.data.datasets[0].data = [answered, ignored];
+                engagementChart.update();
+            } else {
+                engagementChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Answered', 'No Response'],
+                        datasets: [{
+                            data: [answered, ignored],
+                            backgroundColor: ['#4facfe', '#334155'],
+                            borderColor: 'transparent'
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#f8fafc' } }
+                        },
+                        responsive: true
+                    }
+                });
+            }
+        }
+
+        // Initial update and periodic refresh
+        updateStats();
+        setInterval(updateStats, 30000); // 30 seconds
+    </script>
+</body>
+</html>

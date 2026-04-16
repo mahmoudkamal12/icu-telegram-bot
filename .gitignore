@@ -1,0 +1,9 @@
+__pycache__/
+*.db
+*.log
+api_debug.json
+raw_output*.txt
+debug_llm.txt
+compare*.txt
+test_results*.txt
+config.py
