@@ -355,6 +355,14 @@ async def send_new_question(context: ContextTypes.DEFAULT_TYPE, chat_id: int, us
         # Prune DB to 500 questions
         await db_utils.prune_database_to_limit_db(500)
         
+        # Trigger background TikTok video generation
+        try:
+            from tiktok_video_gen import background_video_task
+            asyncio.create_task(background_video_task(question, options, correct_index, explanation))
+            logger.info(f"Triggered async TikTok video generation for user {user_id}.")
+        except Exception as video_err:
+            logger.error(f"Failed to trigger TikTok video generation: {video_err}")
+            
         logger.info(f"Sent new question from model to user {user_id}: {question[:30]}...")
         return True
 

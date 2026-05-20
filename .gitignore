@@ -7,3 +7,11 @@ debug_llm.txt
 compare*.txt
 test_results*.txt
 config.py
+
+*.mp4
+*.mp3
+*.vtt
+cookies.txt
+temp_video_files/
+tiktok_videos/
+tiktok_error_screenshot.png
